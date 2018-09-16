@@ -2,12 +2,18 @@ import re, collections, os
 import typing, datetime
 import jinja2
 import telemonius_routes, telemonius_wrappers
-#TODO: create page renderer
-#TODO: Implement redirects
+
+class TelemoniusEnv:
+    def __init__(self, _content:str, javascript=None, css=None):
+        self.html = _content
+        self.javascript = javascript
+        self.css = css
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.html}, js={self.javascript}, css={self.css})'
 
 class RouteResponse(typing.NamedTuple):
     route:str
-    content:tpyping.Any
+    content:typing.Any
     isredirect:bool
 
 class _telemonius_redirect:
@@ -77,7 +83,7 @@ class Controller:
     def build(self, _route:str, **kwargs) -> str:
         _route_handler = self.routes[list(filter(None, _route.split('/')))]
         if not _route_handler:
-            return getattr(self.routes._404, '__call__', lambda :'<h1>Page Not Found</h1>')()
+            return getattr(self.routes._404, '__call__', lambda :TelemoniusEnv('<h1>Page Not Found</h1>'))()
 
         try:
             self.send_values.update_form(kwargs)
@@ -88,18 +94,18 @@ class Controller:
             return RouteResponse(_route, _action_result, False)
         except:
             telemonius_wrappers.log_error(_route, self.app_name)
-            return getattr(self.routes._error, '__call__', lambda :'<h1>An error occured</h1>')()  
+            return getattr(self.routes._error, '__call__', lambda :TelemoniusEnv('<h1>An error occured</h1>'))()  
  
 
 if __name__ == '__main__':
     with Controller("test_app", logged_in = False) as app:
         @app.action('/home')
         def home_route():
-            return "<h1>Welcome!</h1>"
+            return TelemoniusEnv("<h1>Welcome!</h1>")
 
         @app.action('/home/users/<calc>')
         def get_vals(val):
-            return Controller.render_page('home_page.html', result=int(val)+10)
+            return TelemoniusEnv(Controller.render_page('home_page.html', result=int(val)+10), javascript='stuff.js')
 
         @app.action('/greet_user')
         def get_name():
@@ -146,7 +152,7 @@ if __name__ == '__main__':
 
         @app.action('/final_stop')
         def get_page():
-            return "<h1>Yes! This works</h1>"
+            return TelemoniusEnv("<h1>Yes! This works</h1>")
 
         @app.action('/bounce_off')
         def bounce_off():
@@ -156,11 +162,17 @@ if __name__ == '__main__':
         def test_redirect():
             return app.redirect('/bounce_off')
 
-        '''
+        @app.action('/test')
+        def test():
+            return app.redirect('/home')
+
+        
         print(app.build('/login', **{"username":"Ajax1234", "password":"4ras34asd23"}))
         print(app.build('/register', **{'username':"Ajax1234"}))
         print(app.build('/dashboard'))
         print(app.build('/logout'))
-        '''
-        print(app.build('/home/users/100').content)
+        
+        print(app.build('/test_redirect'))
+        print(app.build('/test'))
+
     
