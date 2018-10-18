@@ -1,15 +1,34 @@
 import re, collections, os
 import typing, datetime
 import jinja2
+import os
+import sys
+
+script_dir = os.path.dirname(__file__)
+
 import telemonius_routes, telemonius_wrappers
 
 class TelemoniusEnv:
     def __init__(self, _content:str, javascript=None, css=None):
         self.html = _content
-        self.javascript = javascript
+        self.js = javascript
         self.css = css
+    @property
+    def response_type(self):
+        return 'env'
+    def __eq__(self, _val:str) -> bool:
+        return self.response_type == _val
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.html}, js={self.javascript}, css={self.css})'
+        return f'{self.__class__.__name__}({self.html}, js={self.js}, css={self.css})'
+
+class TelemoniusJasonify:
+    def __init__(self, **kwargs):
+        self._jsonified_results = kwargs
+    @property
+    def response_type(self):
+        return 'json'
+    def __eq__(self, _val:str) -> bool:
+        return self.response_type == _val
 
 class RouteResponse(typing.NamedTuple):
     route:str
@@ -54,7 +73,7 @@ class Controller:
     @classmethod
     def render_page(cls, _page_link, **kwargs):
         """How should we structure template folders?"""
-        return jinja2.Template(open(_page_link).read()).render(**kwargs)
+        return jinja2.Template(open(os.path.join(script_dir, f'templates/{_page_link}')).read()).render(**kwargs)
 
 
     def redirect(self, _route:str) -> typing.Callable:
@@ -80,23 +99,24 @@ class Controller:
         return __wrapper
 
     @telemonius_wrappers.log()
-    def build(self, _route:str, **kwargs) -> str:
+    def build(self, _route:str, _sessions = {}, **kwargs) -> str:
         _route_handler = self.routes[list(filter(None, _route.split('/')))]
         if not _route_handler:
             return getattr(self.routes._404, '__call__', lambda :TelemoniusEnv('<h1>Page Not Found</h1>'))()
 
+    
         try:
             self.send_values.update_form(kwargs)
+            self.sessions(_sessions)
             [route_method, action_handler] = _route_handler[0]
             _action_result = action_handler(*route_method())
             if isinstance(_action_result, _telemonius_redirect):
                 return RouteResponse(_action_result._redirect_to, self.build(_action_result._redirect_to).content, True)
-            return RouteResponse(_route, _action_result, False)
+            return RouteResponse(_route, _action_result, False)    
         except:
             telemonius_wrappers.log_error(_route, self.app_name)
             return getattr(self.routes._error, '__call__', lambda :TelemoniusEnv('<h1>An error occured</h1>'))()  
- 
-
+        
 if __name__ == '__main__':
     with Controller("test_app", logged_in = False) as app:
         @app.action('/home')
@@ -165,14 +185,15 @@ if __name__ == '__main__':
         @app.action('/test')
         def test():
             return app.redirect('/home')
-
         
+        @app.action('/new_session_action')
+        def second_test():
+            return f'<h1>{app.sessions["newname"]}</h1>'
+
+        @app.action('/')
+        def testing_real_home():
+            return '<h1>This is a true home</h1>'
         print(app.build('/login', **{"username":"Ajax1234", "password":"4ras34asd23"}))
-        print(app.build('/register', **{'username':"Ajax1234"}))
-        print(app.build('/dashboard'))
-        print(app.build('/logout'))
-        
-        print(app.build('/test_redirect'))
-        print(app.build('/test'))
-
-    
+        print(app.build('/final_stop'))
+        print(app.build('/new_session_action', _sessions={'newname':'Baby2000'}))
+        print(app.build('/'))
