@@ -13,12 +13,18 @@ class Forms:
 class Sessions:
     def __init__(self, _initial_values:dict) -> None:
         self._current_values = _initial_values
+    @property
+    def session(self):
+        return self._current_values
     def __contains__(self, _key):
         return _key in self._current_values
     def __getitem__(self, _key):
         return self._current_values[_key]
     def __setitem__(self, _key, _value):
         self._current_values[_key] = _value
+    def __call__(self, _new_session:dict) -> None:
+        if _new_session:
+            self._current_values = _new_session
     def clear_sessions(self):
         self._current_values = {}
 
