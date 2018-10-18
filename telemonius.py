@@ -104,7 +104,6 @@ class Controller:
         if not _route_handler:
             return getattr(self.routes._404, '__call__', lambda :TelemoniusEnv('<h1>Page Not Found</h1>'))()
 
-    
         try:
             self.send_values.update_form(kwargs)
             self.sessions(_sessions)
